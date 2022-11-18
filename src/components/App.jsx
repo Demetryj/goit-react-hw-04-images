@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { ThreeDots } from 'react-loader-spinner';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -7,29 +7,38 @@ import { Searchbar } from './Searchbar';
 import { ImageGallery } from './ImageGallery';
 import { fetchImages } from '../services/fetchImages';
 import { Button } from './Button';
-import Modal from './Modal/';
+import { Modal } from './Modal/';
 import css from './app.module.css';
 
-class App extends Component {
-  state = {
-    searchQuery: '',
-    page: 1,
-    images: [],
-    error: null,
-    loaded: false,
-    isModalOpen: false,
-    largeImageURL: null,
+export const App = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [images, setImages] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState(null);
+
+  const getSearchQuery = event => {
+    event.preventDefault();
+    const inputValue = event.target.elements.query.value.trim().toLowerCase();
+
+    if (searchQuery === inputValue) {
+      return;
+    }
+
+    setSearchQuery(inputValue);
+    setPage(1);
+    setImages([]);
   };
 
-  async componentDidUpdate(_, prevState) {
-    const { searchQuery, page } = this.state;
-
-    if (prevState.searchQuery !== searchQuery || prevState.page !== page)
+  useEffect(() => {
+    const fetch = async () => {
       try {
         if (searchQuery === '') {
           return;
         }
-        this.setState({ loaded: true });
+
+        setLoaded(true);
 
         const searchImages = await fetchImages(searchQuery, page);
 
@@ -39,83 +48,65 @@ class App extends Component {
           );
         }
 
-        this.setState(prevState => {
-          return {
-            images: [...prevState.images, ...searchImages],
-          };
-        });
+        setImages(prevImages => [...prevImages, ...searchImages]);
       } catch (error) {
         console.log(error.message);
       } finally {
-        this.setState({ loaded: false });
+        setLoaded(false);
       }
-  }
+    };
+    fetch();
+  }, [searchQuery, page]);
 
-  getSearchQuery = event => {
-    event.preventDefault();
-    const inputValue = event.target.elements.query.value.trim().toLowerCase();
-
-    if (this.state.searchQuery === inputValue) {
-      return;
-    }
-    this.setState({ searchQuery: inputValue, page: 1, images: [] });
+  const onLoadMoreImages = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  onLoadMoreImages = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
+  const openModal = () => {
+    setIsModalOpen(true);
   };
 
-  openModal = () => {
-    this.setState({ isModalOpen: true });
+  const closeModal = () => {
+    setIsModalOpen(false);
   };
 
-  closeModal = () => {
-    this.setState({ isModalOpen: false });
+  const handleModal = url => {
+    setLargeImageURL(url);
   };
 
-  handleModal = url => {
-    this.setState({ largeImageURL: url });
-  };
+  return (
+    <div className={css.app}>
+      <Searchbar handleSubmit={getSearchQuery} />
 
-  render() {
-    const { searchQuery, images, loaded, isModalOpen, largeImageURL } =
-      this.state;
-    return (
-      <div className={css.app}>
-        <Searchbar handleSubmit={this.getSearchQuery} />
+      {searchQuery && (
+        <ImageGallery
+          imageItems={images}
+          onModal={openModal}
+          onHandleModal={handleModal}
+        />
+      )}
 
-        {searchQuery && (
-          <ImageGallery
-            imageItems={images}
-            onModal={this.openModal}
-            onHandleModal={this.handleModal}
-          />
-        )}
+      {loaded && (
+        <ThreeDots
+          height="80"
+          width="80"
+          radius="9"
+          color="blue"
+          ariaLabel="three-dots-loading"
+          wrapperStyle={{ justifyContent: 'center' }}
+          visible={true}
+        />
+      )}
 
-        {loaded && (
-          <ThreeDots
-            height="80"
-            width="80"
-            radius="9"
-            color="blue"
-            ariaLabel="three-dots-loading"
-            wrapperStyle={{ justifyContent: 'center' }}
-            visible={true}
-          />
-        )}
-
-        {images.length > 0 && !loaded && (
-          <Button handleClickLoadMore={this.onLoadMoreImages}>Load more</Button>
-        )}
-        {isModalOpen && (
-          <Modal onCloseModal={this.closeModal}>
-            <img src={largeImageURL} alt="" />
-          </Modal>
-        )}
-        <ToastContainer />
-      </div>
-    );
-  }
-}
-
-export default App;
+      {images.length > 0 && !loaded && (
+        <Button handleClickLoadMore={onLoadMoreImages}>Load more</Button>
+      )}
+      {isModalOpen && (
+        <Modal onCloseModal={closeModal} isModalOpen={isModalOpen}>
+          <img src={largeImageURL} alt="" />
+        </Modal>
+      )}
+      <ToastContainer />
+    </div>
+  );
+};
